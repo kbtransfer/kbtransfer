@@ -1,0 +1,58 @@
+# KBTRANSFER wiki schema — structural contract for this KB.
+# Referenced by `kb lint` and by the MCP server when deciding where a
+# new page should land. Edit freely, but preserve the four required
+# folders (patterns, decisions, failure-log, entities) unless you
+# know what you are doing.
+
+schema_version: "kbtransfer/0.1"
+
+# ─── Required wiki folders ────────────────────────────────────────────
+# Each folder has a canonical purpose. Agents use these hints when
+# ingesting sources to decide which folder a new page belongs in.
+folders:
+  patterns:
+    purpose: "Reusable problem-solution descriptions. Reference-style."
+    required: true
+  decisions:
+    purpose: "Records of choices made: we picked X over Y because Z. Experience."
+    required: true
+  failure-log:
+    purpose: "Things that broke and what we learned. Experience."
+    required: true
+  entities:
+    purpose: "People, organizations, systems, projects mentioned across the wiki."
+    required: true
+  references:
+    purpose: "Pointers to subscribed packs, useful external links, bibliographies."
+    required: false
+
+# ─── Lint rules ───────────────────────────────────────────────────────
+# Checked by `kb lint`. All rules are advisory by default; set
+# severity to "error" to fail CI on violations.
+lint:
+  orphan_pages:
+    severity: "warning"
+    description: "A page that no other page links to and that is not an index."
+  stale_claims:
+    severity: "info"
+    description: "Pages not touched for over {threshold_days} days that claim current state."
+    threshold_days: 180
+  missing_crossrefs:
+    severity: "warning"
+    description: "Entities referenced in prose but not linked to entities/ pages."
+  contradictions:
+    severity: "error"
+    description: "Two pages assert conflicting facts about the same entity."
+
+# ─── Front-matter conventions ─────────────────────────────────────────
+# Optional YAML front-matter fields the agent will populate and the
+# lint will enforce when present.
+frontmatter:
+  recognized_fields:
+    - title
+    - created
+    - updated
+    - tags
+    - entities
+    - status         # draft | current | archived
+    - confidence     # low | medium | high

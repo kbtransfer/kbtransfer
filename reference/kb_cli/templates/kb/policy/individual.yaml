@@ -1,0 +1,36 @@
+# Consumer + publisher policy for an individual-tier KB.
+# Low friction, suited to a single developer who accumulates
+# personal knowledge and occasionally shares with the community.
+
+policy_version: "kbtransfer/0.1"
+tier: "individual"
+
+# ─── Trust model ──────────────────────────────────────────────────────
+# Trust-on-first-use: first time a publisher is seen, record their key
+# and accept their pack. Subsequent key changes warn and require a
+# manual confirm via `kb subscribe --confirm-key-change`.
+trust:
+  model: "tofu"
+  tofu_store: ".kb/trust-store.yaml"
+  warn_on_key_change: true
+
+# ─── Consumer acceptance rules ────────────────────────────────────────
+consumer:
+  redaction_level_min: "minimal"
+  license_class_allowed:
+    - "open"
+    - "permissive"
+    - "commercial-with-warranty"
+  require_adversarial_verification: false
+  reject_yanked_versions: true
+  trust_inheritance: "inherit-from-parent"
+  max_dependency_depth: 8
+
+# ─── Publisher defaults (applied when this KB produces packs) ─────────
+publisher:
+  default_redaction_level: "minimal"
+  human_review:
+    required: false
+  distiller_mode: "manual"      # manual | single-model | dual-model
+  default_license: "Apache-2.0"
+  adversarial_verification_required: false

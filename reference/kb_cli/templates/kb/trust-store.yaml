@@ -1,0 +1,29 @@
+# Publisher allowlist for this KB.
+# Every publisher whose packs this KB may verify against must appear
+# here, keyed by DID. Each publisher lists one or more Ed25519 public
+# keys. Keys are the single load-bearing input to offline verification.
+#
+# Population rules depend on the trust_model declared in policy.yaml:
+#   - allowlist (default for enterprise): populated manually or via
+#     out-of-band provisioning; unknown publishers are rejected.
+#   - tofu (default for individual/team): first encounter records the
+#     publisher's key; subsequent key changes require explicit confirm.
+
+trust_store_version: "kbtransfer/0.1"
+
+publishers: {}
+
+# Example entry (populated by `kb subscribe` under tofu or added by
+# hand under allowlist):
+#
+# publishers:
+#   did:web:smartchip.ie:
+#     display_name: "SMARTCHIP Limited"
+#     keys:
+#       - key_id: "smartchip-2026Q2"
+#         algorithm: "ed25519"
+#         public_key_hex: "5e7508...32b1"
+#         valid_from: "2026-04-01T00:00:00Z"
+#         valid_until: "2026-09-30T23:59:59Z"
+#         added_at: "2026-04-14T10:00:00Z"
+#         added_by: "kb subscribe --from https://github.com/..."

@@ -7,6 +7,7 @@ from pathlib import Path
 import click
 
 from kb_cli import __version__
+from kb_cli.init import init_command
 
 
 @click.group(
@@ -16,6 +17,9 @@ from kb_cli import __version__
 @click.version_option(__version__, prog_name="kb")
 def cli() -> None:
     pass
+
+
+cli.add_command(init_command)
 
 
 @cli.command(help="Print diagnostic information about the current KB and environment.")

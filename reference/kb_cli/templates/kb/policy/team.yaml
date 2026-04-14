@@ -1,0 +1,40 @@
+# Consumer + publisher policy for a team-tier KB.
+# Small engineering team (2-15 people) with a shared KB and occasional
+# cross-team sharing. Moderate redaction, one reviewer on publish.
+
+policy_version: "kbtransfer/0.1"
+tier: "team"
+
+# ─── Trust model ──────────────────────────────────────────────────────
+# Same TOFU base as individual, but key changes raise a warning that
+# the team-lead-configured reviewer must acknowledge before the pack
+# is accepted.
+trust:
+  model: "tofu"
+  tofu_store: ".kb/trust-store.yaml"
+  warn_on_key_change: true
+  require_reviewer_ack_on_key_change: true
+
+# ─── Consumer acceptance rules ────────────────────────────────────────
+consumer:
+  redaction_level_min: "standard"
+  license_class_allowed:
+    - "open"
+    - "permissive"
+    - "commercial-with-warranty"
+  require_adversarial_verification: false
+  reject_yanked_versions: true
+  trust_inheritance: "inherit-from-parent"
+  max_dependency_depth: 8
+
+# ─── Publisher defaults (applied when this KB produces packs) ─────────
+publisher:
+  default_redaction_level: "standard"
+  human_review:
+    required: true
+    min_reviewers: 1
+    reviewer_roles:
+      - "team-lead"
+  distiller_mode: "single-model"
+  default_license: "Apache-2.0"
+  adversarial_verification_required: false

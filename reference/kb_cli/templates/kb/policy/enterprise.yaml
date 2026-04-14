@@ -1,0 +1,43 @@
+# Consumer + publisher policy for an enterprise-tier KB.
+# Regulated contexts (fin-tech, gov-tech, gaming). Strict allowlist,
+# strict redaction, two reviewers plus legal, dual-model adversarial
+# verification on publish.
+
+policy_version: "kbtransfer/0.1"
+tier: "enterprise"
+
+# ─── Trust model ──────────────────────────────────────────────────────
+# Strict allowlist: no publisher is trusted unless security has added
+# them to .kb/trust-store.yaml explicitly. TOFU is disabled.
+trust:
+  model: "allowlist"
+  tofu_enabled: false
+  warn_on_key_change: true
+  reject_unknown_publishers: true
+
+# ─── Consumer acceptance rules ────────────────────────────────────────
+consumer:
+  redaction_level_min: "strict"
+  license_class_allowed:
+    - "commercial-with-warranty"
+    - "permissive-with-warranty"
+  require_adversarial_verification: true
+  reject_yanked_versions: true
+  trust_inheritance: "namespace-scoped"
+  max_dependency_depth: 4
+  require_audit_trail: true
+
+# ─── Publisher defaults (applied when this KB produces packs) ─────────
+publisher:
+  default_redaction_level: "strict"
+  human_review:
+    required: true
+    min_reviewers: 2
+    reviewer_roles:
+      - "compliance-officer"
+      - "domain-expert"
+    require_legal_signoff: true
+  distiller_mode: "dual-model"
+  default_license: "LicenseRef-internal-commercial"
+  adversarial_verification_required: true
+  adversarial_verifier_model_family_must_differ: true
