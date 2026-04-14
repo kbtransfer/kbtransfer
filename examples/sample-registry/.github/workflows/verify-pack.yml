@@ -1,0 +1,57 @@
+name: Verify submitted packs
+
+on:
+  pull_request:
+    paths:
+      - "packs/**"
+      - "publishers/**"
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the registry
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Check out the KBTRANSFER reference implementation
+        uses: actions/checkout@v4
+        with:
+          repository: your-org/KBTRANSFER
+          path: kbtransfer
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install kb_pack from the reference implementation
+        working-directory: kbtransfer
+        run: pip install -e .
+
+      - name: Resolve the set of changed tarballs
+        id: changed
+        run: |
+          git fetch origin "${{ github.base_ref }}"
+          CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD -- 'packs/**/*.tar' || true)
+          if [ -z "$CHANGED" ]; then
+            echo "args=" >> "$GITHUB_OUTPUT"
+          else
+            ARGS=""
+            for f in $CHANGED; do
+              ARGS="$ARGS --pack $f"
+            done
+            echo "args=$ARGS" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run the pre-merge verifier
+        run: |
+          python scripts/verify_submission.py . ${{ steps.changed.outputs.args }}
+
+      - name: Rebuild index.json
+        if: success()
+        run: |
+          python -c "from kb_registry import write_index; write_index('.')"
