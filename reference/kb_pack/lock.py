@@ -29,22 +29,29 @@ SPEC_HEADER = "autoevolve-pack/0.1.1"
 
 @dataclass(frozen=True)
 class Lock:
+    """pack.lock parsed/rendered form.
+
+    `content_root` and `pack_root` always carry the `sha256:` prefix
+    so they can be compared byte-for-byte against attestations and
+    canonical JSON fields (spec §5.3) without extra normalization.
+    """
+
     entries: list[FileEntry]
-    content_root: str
-    pack_root: str
+    content_root: str  # e.g. "sha256:abcd..."
+    pack_root: str  # e.g. "sha256:abcd..."
 
-    @property
-    def content_root_full(self) -> str:
-        return f"sha256:{self.content_root}"
 
-    @property
-    def pack_root_full(self) -> str:
-        return f"sha256:{self.pack_root}"
+def _with_sha_prefix(hex_value: str) -> str:
+    return hex_value if hex_value.startswith("sha256:") else f"sha256:{hex_value}"
 
 
 def build_lock_for(pack_root: Path) -> Lock:
     content_root, packed_root, entries = compute_roots(pack_root)
-    return Lock(entries=entries, content_root=content_root, pack_root=packed_root)
+    return Lock(
+        entries=entries,
+        content_root=_with_sha_prefix(content_root),
+        pack_root=_with_sha_prefix(packed_root),
+    )
 
 
 def render_lock(lock: Lock) -> str:
@@ -61,8 +68,8 @@ def render_lock(lock: Lock) -> str:
     for entry in lock.entries:
         lines.append(f"{entry.relative_path.ljust(width)}sha256:{entry.sha256_hex}")
     lines.append("")
-    lines.append(f"content_root: sha256:{lock.content_root}")
-    lines.append(f"pack_root:    sha256:{lock.pack_root}")
+    lines.append(f"content_root: {lock.content_root}")
+    lines.append(f"pack_root:    {lock.pack_root}")
     lines.append("")
     return "\n".join(lines)
 
@@ -82,10 +89,10 @@ def parse_lock(text: str) -> Lock:
         if not line or line.startswith("#"):
             continue
         if line.startswith("content_root:"):
-            content_root = line.split(":", 2)[-1].strip()
+            content_root = _with_sha_prefix(line.split(":", 1)[1].strip())
             continue
         if line.startswith("pack_root:"):
-            pack_root = line.split(":", 2)[-1].strip()
+            pack_root = _with_sha_prefix(line.split(":", 1)[1].strip())
             continue
         # Entries look like: path<whitespace>sha256:hex
         if "sha256:" not in line:
