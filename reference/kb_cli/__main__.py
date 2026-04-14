@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from kb_cli.cli import cli
+
 
 def main() -> int:
-    raise NotImplementedError("kb CLI is scaffolded; implementation lands in Phase 1")
+    cli()
+    return 0
 
 
 if __name__ == "__main__":
