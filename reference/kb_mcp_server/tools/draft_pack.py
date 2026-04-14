@@ -59,6 +59,21 @@ TOOL = types.Tool(
                 "default": False,
                 "description": "Overwrite an existing draft with the same pack_id.",
             },
+            "dependencies": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "pack_id": {"type": "string"},
+                        "version": {"type": "string"},
+                        "scope": {"type": "string"},
+                        "registry_hint": {"type": "string"},
+                    },
+                    "required": ["pack_id", "version"],
+                    "additionalProperties": False,
+                },
+                "description": "Optional dependencies recorded in the manifest.",
+            },
         },
         "required": ["pack_id", "title", "summary", "source_pages"],
         "additionalProperties": False,
@@ -101,6 +116,7 @@ def _write_manifest(
     publisher_id: str,
     license_spdx: str,
     page_count: int,
+    dependencies: list[dict[str, Any]] | None = None,
 ) -> None:
     manifest = {
         "spec_version": "autoevolve-pack/0.1.1",
@@ -126,6 +142,8 @@ def _write_manifest(
             "publisher_identity",
         ],
     }
+    if dependencies:
+        manifest["dependencies"] = dependencies
     (draft_dir / "pack.manifest.yaml").write_text(
         yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8"
     )
@@ -149,6 +167,7 @@ async def HANDLER(root: Path, arguments: dict[str, Any]) -> list[types.TextConte
     namespace = arguments.get("namespace", "")
     license_spdx = arguments.get("license_spdx", "Apache-2.0")
     force = bool(arguments.get("force", False))
+    dependencies = arguments.get("dependencies") or None
 
     if not isinstance(pack_id, str) or not pack_id:
         return error("invalid_pack_id", "Argument 'pack_id' must be a non-empty string.")
@@ -195,6 +214,7 @@ async def HANDLER(root: Path, arguments: dict[str, Any]) -> list[types.TextConte
         publisher_id=ctx.publisher_id,
         license_spdx=license_spdx,
         page_count=len(copied),
+        dependencies=dependencies,
     )
     _write_attestation_stubs(draft_dir)
 

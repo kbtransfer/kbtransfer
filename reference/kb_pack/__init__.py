@@ -51,6 +51,12 @@ from kb_pack.signature import (
     verify_attestation_signature,
     verify_pack_root,
 )
+from kb_pack.dependency import (
+    DEFAULT_MAX_DEPTH,
+    DEFAULT_MAX_INHERIT_DEPTH,
+    RecursiveVerificationResult,
+    verify_with_dependencies,
+)
 from kb_pack.verify import PublisherKeyResolver, VerificationResult, verify_pack
 
 __all__ = [
@@ -59,6 +65,10 @@ __all__ = [
     "AttestationError",
     "BuildError",
     "BuildResult",
+    "DEFAULT_MAX_DEPTH",
+    "DEFAULT_MAX_INHERIT_DEPTH",
+    "RecursiveVerificationResult",
+    "verify_with_dependencies",
     "FileEntry",
     "Lock",
     "Manifest",
