@@ -32,3 +32,6 @@ build/
 # Local env
 .env
 .env.local
+
+# Out-of-scope personal notes kept alongside the project
+KBAE-ROADMAP.md
