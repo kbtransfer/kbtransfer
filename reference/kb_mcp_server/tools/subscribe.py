@@ -48,11 +48,12 @@ from kb_pack import verify_pack
 TOOL = types.Tool(
     name="kb/subscribe/0.1",
     description=(
-        "Subscribe to a pack. Source is a local tarball path or an "
-        "extracted pack directory. The pack is verified against the "
-        "trust store; on success it lands under subscriptions/<did>/"
-        "<pack_id>/<version>/ as read-only content. TOFU tiers register "
-        "newly-seen publisher keys automatically."
+        "Subscribe to a pack. Provide either a local `source` path (tarball "
+        "or directory) OR a `{registry_url, pack_id, constraint}` triple to "
+        "fetch from a kb-registry. The pack is verified against the trust "
+        "store; on success it lands under subscriptions/<did>/<pack_id>/"
+        "<version>/ as read-only content. TOFU tiers register newly-seen "
+        "publisher keys automatically."
     ),
     inputSchema={
         "type": "object",
@@ -61,12 +62,24 @@ TOOL = types.Tool(
                 "type": "string",
                 "description": "Local path to a .tar pack or an extracted pack directory.",
             },
+            "registry_url": {
+                "type": "string",
+                "description": "Registry URL (file:// or bare path). Alternative to `source`.",
+            },
+            "pack_id": {
+                "type": "string",
+                "description": "Required when subscribing via registry_url.",
+            },
+            "constraint": {
+                "type": "string",
+                "default": "*",
+                "description": "Version constraint (semver). Defaults to latest.",
+            },
             "display_name": {
                 "type": "string",
                 "description": "Optional display name to record in the trust store.",
             },
         },
-        "required": ["source"],
         "additionalProperties": False,
     },
 )
@@ -109,14 +122,43 @@ def _did_to_dirname(publisher_id: str) -> str:
 
 
 async def HANDLER(root: Path, arguments: dict[str, Any]) -> list[types.TextContent]:
+    root = root.resolve()
     source = arguments.get("source")
+    registry_url = arguments.get("registry_url")
     display_name = arguments.get("display_name")
-    if not isinstance(source, str) or not source:
-        return error("invalid_source", "Argument 'source' must be a non-empty string.")
 
-    source_path = Path(source).expanduser().resolve()
-    if not source_path.exists():
-        return error("source_not_found", f"No file or directory at {source_path}")
+    # Resolve registry-mode subscribe into an equivalent local path.
+    fetched_dir: Path | None = None
+    fetched_scratch: str | None = None
+    if isinstance(registry_url, str) and registry_url:
+        pack_id = arguments.get("pack_id")
+        constraint = arguments.get("constraint", "*")
+        if not isinstance(pack_id, str) or not pack_id:
+            return error(
+                "invalid_pack_id",
+                "pack_id is required when subscribing via registry_url.",
+            )
+        from kb_registry import RegistryError, open_registry
+
+        try:
+            registry = open_registry(registry_url)
+            resolved = registry.resolve(pack_id, constraint)
+            fetched_scratch = tempfile.mkdtemp(prefix="kbsub-reg-")
+            fetched_dir = registry.fetch(
+                resolved.pack_id, resolved.version, Path(fetched_scratch)
+            )
+        except RegistryError as exc:
+            return error("registry_resolve_failed", str(exc))
+        source_path = fetched_dir
+    else:
+        if not isinstance(source, str) or not source:
+            return error(
+                "invalid_source",
+                "Provide either 'source' (local path) or 'registry_url' + 'pack_id'.",
+            )
+        source_path = Path(source).expanduser().resolve()
+        if not source_path.exists():
+            return error("source_not_found", f"No file or directory at {source_path}")
 
     try:
         ctx = load_publisher_context(root)
@@ -213,3 +255,5 @@ async def HANDLER(root: Path, arguments: dict[str, Any]) -> list[types.TextConte
         )
     finally:
         shutil.rmtree(temp_holder, ignore_errors=True)
+        if fetched_scratch:
+            shutil.rmtree(fetched_scratch, ignore_errors=True)

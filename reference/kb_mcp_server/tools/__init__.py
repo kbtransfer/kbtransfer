@@ -26,6 +26,9 @@ from . import (
     policy_set as _policy_set,
     publish as _publish,
     read as _read,
+    registry_describe as _registry_describe,
+    registry_resolve as _registry_resolve,
+    registry_search as _registry_search,
     search as _search,
     subscribe as _subscribe,
     verify as _verify,
@@ -47,6 +50,9 @@ _MODULES = [
     _publish,
     _subscribe,
     _verify,
+    _registry_describe,
+    _registry_resolve,
+    _registry_search,
 ]
 
 TOOLS: list[types.Tool] = [mod.TOOL for mod in _MODULES]
