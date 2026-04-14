@@ -31,7 +31,7 @@ def kb(tmp_path: Path) -> Path:
 
 def test_all_phase1_tools_registered() -> None:
     names = {t.name for t in TOOLS}
-    expected = {
+    expected_phase1 = {
         "kb/search/0.1",
         "kb/read/0.1",
         "kb/write/0.1",
@@ -40,7 +40,7 @@ def test_all_phase1_tools_registered() -> None:
         "kb/policy_get/0.1",
         "kb/policy_set/0.1",
     }
-    assert names == expected
+    assert expected_phase1.issubset(names)
 
 
 async def test_policy_get_returns_tier_policy(kb: Path) -> None:

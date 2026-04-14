@@ -18,12 +18,17 @@ from typing import Any
 import mcp.types as types
 
 from . import (
+    distill as _distill,
+    draft_pack as _draft_pack,
     ingest_source as _ingest_source,
     lint as _lint,
     policy_get as _policy_get,
     policy_set as _policy_set,
+    publish as _publish,
     read as _read,
     search as _search,
+    subscribe as _subscribe,
+    verify as _verify,
     write as _write,
 )
 
@@ -37,6 +42,11 @@ _MODULES = [
     _lint,
     _policy_get,
     _policy_set,
+    _draft_pack,
+    _distill,
+    _publish,
+    _subscribe,
+    _verify,
 ]
 
 TOOLS: list[types.Tool] = [mod.TOOL for mod in _MODULES]

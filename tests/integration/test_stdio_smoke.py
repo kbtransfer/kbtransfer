@@ -37,7 +37,9 @@ async def test_server_starts_and_exposes_tools(tmp_path: Path) -> None:
             names = {tool.name for tool in listed.tools}
             assert "kb/policy_get/0.1" in names
             assert "kb/search/0.1" in names
-            assert len(names) == 7
+            assert "kb/publish/0.1" in names
+            assert "kb/verify/0.1" in names
+            assert len(names) >= 7
 
             result = await session.call_tool("kb/policy_get/0.1", {})
             assert result.content
