@@ -1,0 +1,16 @@
+# NEVER commit private signing keys — these are the authority to publish
+# packs under your publisher_id. Only the .pub counterparts go to git so
+# consumers can verify your signatures.
+.kb/keys/*.priv
+
+# Build-time distiller artifact; recreated on each kb/distill call and
+# deleted by kb/publish before the pack_root is computed, so it MUST NOT
+# live in git (history would drift from what the tarball actually ships).
+drafts/*/.distill-report.json
+
+# Python cache from any local tooling runs against this KB.
+__pycache__/
+*.pyc
+
+# macOS metadata.
+.DS_Store

@@ -50,6 +50,19 @@ def _install_static_kb_files(kb_dir: Path, templates: Path) -> None:
     shutil.copyfile(templates / "kb" / "trust-store.yaml", kb_dir / "trust-store.yaml")
 
 
+def _install_gitignore(root: Path, templates: Path) -> None:
+    # Template filename is `gitignore` (no leading dot) because some build
+    # pipelines strip dotfiles from package data. Copied as `.gitignore`
+    # at the KB root so `git init` inside the KB picks it up immediately.
+    # If the user has their own .gitignore already, leave it alone —
+    # merging is their call, and the private-key rule is the load-bearing
+    # line they already have or need to add themselves.
+    dst = root / ".gitignore"
+    if dst.exists():
+        return
+    shutil.copyfile(templates / "gitignore", dst)
+
+
 def _install_wiki(root: Path, templates: Path) -> None:
     _copy_tree(templates / "wiki", root / "wiki")
 
@@ -86,6 +99,7 @@ def scaffold(
 
     _install_static_kb_files(kb_dir, templates)
     _install_policy(kb_dir, templates, tier)
+    _install_gitignore(root, templates)
     _install_wiki(root, templates)
     _create_runtime_folders(root)
 

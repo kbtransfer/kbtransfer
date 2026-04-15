@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 import yaml
 from click.testing import CliRunner
-
 from kb_cli.cli import cli
 from kb_cli.init import REQUIRED_WIKI_FOLDERS, RUNTIME_FOLDERS, scaffold
 
@@ -59,6 +58,35 @@ def test_scaffold_enterprise_tier(tmp_path: Path) -> None:
     assert policy["trust"]["model"] == "allowlist"
     assert policy["publisher"]["human_review"]["min_reviewers"] == 2
     assert policy["publisher"]["distiller_mode"] == "dual-model"
+
+
+def test_scaffold_emits_gitignore_that_excludes_private_keys(tmp_path: Path) -> None:
+    """Critical security invariant: `kb init` must leave a .gitignore at
+    the KB root that excludes .kb/keys/*.priv. A user who commits the
+    scaffolded KB without this protection leaks their signing key."""
+    scaffold(
+        root=tmp_path / "kb",
+        tier="individual",
+        publisher_id="did:web:example.invalid",
+    )
+    gi = tmp_path / "kb" / ".gitignore"
+    assert gi.is_file(), ".gitignore was not emitted by kb init"
+    content = gi.read_text(encoding="utf-8")
+    assert ".kb/keys/*.priv" in content, (
+        ".gitignore exists but does not exclude private keys; "
+        "this is the load-bearing rule"
+    )
+
+
+def test_scaffold_preserves_existing_gitignore(tmp_path: Path) -> None:
+    """If the user already placed a .gitignore at the target root
+    (uncommon but possible when seeding from a git repo), leave it
+    alone — merging is their call."""
+    root = tmp_path / "kb"
+    root.mkdir()
+    (root / ".gitignore").write_text("# user-supplied\nnode_modules/\n", encoding="utf-8")
+    scaffold(root=root, tier="individual", publisher_id="did:web:x.example")
+    assert "# user-supplied" in (root / ".gitignore").read_text(encoding="utf-8")
 
 
 def test_scaffold_generates_keypair(tmp_path: Path) -> None:
