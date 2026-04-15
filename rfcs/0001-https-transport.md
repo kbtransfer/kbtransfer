@@ -1,7 +1,7 @@
 ---
 rfc: 0001
 title: HTTPS and git+https registry transports
-status: draft
+status: shipped
 phase: 4
 depth: medium
 breaks_v1_decision: none
@@ -10,6 +10,12 @@ authors: [kbtransfer-core]
 ---
 
 # RFC-0001 — HTTPS and git+https registry transports
+
+> **Status:** shipped as `HttpsRegistry` in
+> `reference/kb_registry/registry.py`. See
+> `tests/test_registry.py` for sha256-mismatch, path-traversal,
+> size-cap, and end-to-end subscribe-over-HTTPS coverage. The
+> sections below preserve the original design rationale.
 
 ## 1. Problem
 

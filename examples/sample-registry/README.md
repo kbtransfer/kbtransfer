@@ -34,9 +34,11 @@ kb-mcp --root my-kb
 #   kb/subscribe/0.1          {"registry_url": "file://...", "pack_id": "x", "constraint": "^1.0"}
 ```
 
-Phase 3 v1 only supports `file://` and bare paths. `https://` and
-`git+https://` transports are specified by the AutoEvolve registry
-spec but not yet shipped in the reference implementation.
+Supported URL schemes: `file://`, bare paths, `https://`, and
+`git+https://`. HTTPS fetches verify every tarball against the
+index-declared sha256 before extraction; index-entries without
+`sha256` are refused. See `HttpsRegistry` in
+`reference/kb_registry/registry.py`.
 
 ## Publisher side
 

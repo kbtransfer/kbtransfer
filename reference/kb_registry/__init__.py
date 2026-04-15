@@ -11,6 +11,7 @@ from kb_registry.index import (
     write_index,
 )
 from kb_registry.registry import (
+    HttpsRegistry,
     Registry,
     RegistryError,
     ResolveResult,
@@ -20,6 +21,7 @@ from kb_registry.semver import Version, highest_matching, matches
 
 __all__ = [
     "INDEX_VERSION",
+    "HttpsRegistry",
     "Registry",
     "RegistryError",
     "ResolveResult",

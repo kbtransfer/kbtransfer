@@ -106,9 +106,9 @@ and `memory/design_decisions_v2_2026_04_15.md`.
 │  ├── drafts/         in-progress pack candidates            │
 │  └── published/      outgoing signed pack tarballs          │
 └──────────────────────────────┬──────────────────────────────┘
-                               │ git push/pull (or v2: HTTPS)
+                               │ git push/pull or HTTPS
 ┌──────────────────────────────▼──────────────────────────────┐
-│  Registry (git-based today; HTTPS in v2 RFC-0001)           │
+│  Registry (git-based, file://, https:// all supported)      │
 │  ├── publishers/{did}/keys.json     trust anchor            │
 │  ├── packs/{pack_id}/{version}.tar  signed tarballs         │
 │  ├── index.json                     regenerated on merge    │
@@ -124,7 +124,7 @@ Five Python packages under `reference/` implement the server side:
 | `kb_mcp_server` | stdio MCP server hosting the 15 `kb/*` tools |
 | `kb_pack` | manifest, canonical JSON, Merkle roots, signing, verification, recursive dependency verification with trust inheritance |
 | `kb_distiller` | regex scrubber, tier-aware pipeline (manual / single-model / dual-model), model-family classifier (`family.py`) |
-| `kb_registry` | file-based registry client with semver resolution + index builder; v2 RFC-0001 will subclass for HTTPS / git+https |
+| `kb_registry` | registry client (`file://`, bare path, `https://`, `git+https://`) with semver resolution + index builder; HTTPS transport verifies every tarball against the index-declared sha256 before extraction |
 
 ## 4. The three tiers
 
@@ -408,7 +408,7 @@ The MCP API is identical across all three; only the
 
 ### v2 extensions (RFC track)
 
-- **RFC-0001** — `https://` + `git+https://` transports. Phase 4.
+- **RFC-0001** — `https://` + `git+https://` transports. **Shipped** in `HttpsRegistry` (`reference/kb_registry/registry.py`).
 - **RFC-0002** — `kb/registry_submit/0.1` MCP tool over the wire,
   jointly with the existing PR-based curated path. Phase 4.
 - **RFC-0005** — Federation graph: `federation.json` declares

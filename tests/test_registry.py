@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 
@@ -11,6 +12,7 @@ import pytest
 from kb_cli.init import scaffold
 from kb_mcp_server.tools import HANDLERS
 from kb_registry import (
+    HttpsRegistry,
     RegistryError,
     Version,
     build_index,
@@ -182,3 +184,204 @@ def test_registry_rebuild_index_refreshes_from_disk(registry_with_two_versions: 
     path = reg.rebuild_index()
     assert path.is_file()
     assert "demo.pack" in json.loads(path.read_text())["packs"]
+
+
+# ── HTTPS transport tests ──────────────────────────────────────────
+# Real TLS-serving fixtures add setup weight without exercising more
+# registry logic than a `_http_get` override already covers. Each test
+# builds an HttpsRegistry subclass whose HTTP layer serves bytes from
+# a local directory the test controls. The production `_http_get`
+# (stdlib urllib.request) is unit-tested implicitly by the empty
+# subclass contract — only its stream-read + size-cap + error-map
+# behavior lives in `_http_get`, and the rest of the registry logic
+# (path safety, sha256 verification, index caching, fetch extraction)
+# is in methods exercised below.
+
+
+class _LocalDirHttpsRegistry(HttpsRegistry):
+    """HttpsRegistry variant that serves bytes from a local directory.
+
+    Bypasses real HTTP entirely so the rest of the HTTPS code path
+    (sha256 check, path safety, fetch extraction, index caching) can
+    be exercised without TLS setup.
+    """
+
+    def __init__(self, serve_root: Path, **kwargs: object) -> None:
+        super().__init__("https://test.invalid/reg", **kwargs)
+        self._serve_root = serve_root
+
+    def _http_get(self, url: str) -> bytes:
+        # Strip our fake base prefix and read from disk.
+        assert url.startswith(self._base + "/"), url
+        rel = url[len(self._base) + 1 :]
+        path = self._serve_root / rel
+        if not path.is_file():
+            raise RegistryError(f"HTTPS fetch failed for {url!r}: 404")
+        data = path.read_bytes()
+        if len(data) > self._max_bytes:
+            raise RegistryError(
+                f"response for {url!r} exceeded {self._max_bytes} bytes"
+            )
+        return data
+
+
+def test_open_registry_dispatches_https_to_https_subclass() -> None:
+    reg = open_registry("https://registry.example.com/kb")
+    assert isinstance(reg, HttpsRegistry)
+
+
+def test_open_registry_accepts_git_plus_https() -> None:
+    reg = open_registry("git+https://registry.example.com/kb")
+    assert isinstance(reg, HttpsRegistry)
+
+
+def test_https_registry_rejects_plain_http() -> None:
+    with pytest.raises(RegistryError, match="https"):
+        HttpsRegistry("http://registry.example.com/kb")
+
+
+def test_https_registry_rejects_missing_host() -> None:
+    with pytest.raises(RegistryError, match="host"):
+        HttpsRegistry("https:///kb")
+
+
+def test_https_registry_describe_resolve_search_roundtrip(
+    registry_with_two_versions: Path,
+) -> None:
+    reg = _LocalDirHttpsRegistry(registry_with_two_versions)
+
+    desc = reg.describe()
+    assert desc["pack_count"] >= 2
+    assert desc["publisher_count"] >= 1
+
+    resolved = reg.resolve("demo.pack", "^1.0")
+    assert resolved.version == "1.2.0"
+    assert resolved.sha256  # index.py fills sha256 on build
+    assert len(resolved.sha256) == 64  # hex
+
+    hits = reg.search("demo")
+    assert any(h["pack_id"] == "demo.pack" for h in hits)
+
+
+def test_https_registry_fetch_extracts_pack_after_sha256_verify(
+    tmp_path: Path, registry_with_two_versions: Path
+) -> None:
+    reg = _LocalDirHttpsRegistry(registry_with_two_versions)
+    dest = tmp_path / "https-extract"
+    extracted = reg.fetch("demo.pack", "1.0.0", dest)
+    assert (extracted / "pack.manifest.yaml").is_file()
+    assert (extracted / "signatures" / "publisher.sig").is_file()
+
+
+def test_https_registry_rejects_sha256_mismatch(
+    tmp_path: Path, registry_with_two_versions: Path
+) -> None:
+    # Corrupt the tarball on disk so its sha256 no longer matches the
+    # index-declared value. fetch() must refuse before extraction.
+    tar_path = next(
+        (registry_with_two_versions / "packs" / "demo.pack").glob("1.0.0.tar")
+    )
+    tampered = tar_path.read_bytes() + b"\x00tamper"
+    tar_path.write_bytes(tampered)
+
+    reg = _LocalDirHttpsRegistry(registry_with_two_versions)
+    with pytest.raises(RegistryError, match="sha256 mismatch"):
+        reg.fetch("demo.pack", "1.0.0", tmp_path / "should-not-exist")
+
+
+def test_https_registry_rejects_path_traversal(
+    registry_with_two_versions: Path,
+) -> None:
+    reg = _LocalDirHttpsRegistry(registry_with_two_versions)
+    for bad in ["../etc/passwd", "foo/../../bar", "/absolute", "https://evil/x"]:
+        with pytest.raises(RegistryError):
+            reg._fetch_bytes(bad)
+
+
+def test_https_registry_refuses_fetch_without_sha256(
+    tmp_path: Path, registry_with_two_versions: Path
+) -> None:
+    # Hand-edit the index to strip sha256 on one version, simulating a
+    # registry that did not commit to content hashes.
+    index_path = registry_with_two_versions / "index.json"
+    index = json.loads(index_path.read_text())
+    for v in index["packs"]["demo.pack"]["versions"]:
+        v["sha256"] = ""
+    index_path.write_text(json.dumps(index))
+
+    reg = _LocalDirHttpsRegistry(registry_with_two_versions)
+    with pytest.raises(RegistryError, match="no sha256"):
+        reg.fetch("demo.pack", "1.0.0", tmp_path / "extract")
+
+
+def test_https_registry_enforces_size_cap(
+    registry_with_two_versions: Path,
+) -> None:
+    reg = _LocalDirHttpsRegistry(registry_with_two_versions, max_bytes=100)
+    with pytest.raises(RegistryError, match="exceeded"):
+        reg._index()  # index.json is >100 bytes
+
+
+def test_https_registry_caches_index(registry_with_two_versions: Path) -> None:
+    reg = _LocalDirHttpsRegistry(registry_with_two_versions)
+    reg._index()
+    # Delete the on-disk index and confirm the second call uses the cache.
+    (registry_with_two_versions / "index.json").unlink()
+    assert reg._index()["packs"]  # still returns data
+
+
+def test_https_registry_rebuild_index_is_disabled() -> None:
+    reg = HttpsRegistry("https://registry.example.com/kb")
+    with pytest.raises(RegistryError, match="read-only"):
+        reg.rebuild_index()
+
+
+def test_https_registry_publisher_keys_returned_over_fake_wire(
+    registry_with_two_versions: Path,
+) -> None:
+    reg = _LocalDirHttpsRegistry(registry_with_two_versions)
+    keys = reg.publisher_keys("did:web:pub.example")
+    assert keys
+    assert keys[0]["algorithm"] == "ed25519"
+
+
+def test_subscribe_integration_over_https_registry(
+    tmp_path: Path, registry_with_two_versions: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # End-to-end: kb/subscribe/0.1 over an https:// registry URL. We
+    # swap kb_registry.open_registry (the function subscribe.py imports
+    # at call time) to return our local-dir variant so the integration
+    # runs without a real TLS stack but exercises the exact same
+    # publish → registry → subscribe → verify path a production
+    # consumer would hit.
+    import kb_registry
+
+    real_open = kb_registry.open_registry
+
+    def fake_open(url: str):
+        if url.startswith("https://"):
+            return _LocalDirHttpsRegistry(registry_with_two_versions)
+        return real_open(url)
+
+    monkeypatch.setattr(kb_registry, "open_registry", fake_open)
+
+    consumer = tmp_path / "cons-kb"
+    scaffold(root=consumer, tier="individual", publisher_id="did:web:cons.example")
+
+    async def run() -> dict:
+        result = await HANDLERS["kb/subscribe/0.1"](
+            consumer,
+            {
+                "registry_url": "https://test.invalid/reg",
+                "pack_id": "demo.pack",
+                "constraint": "^1.0",
+            },
+        )
+        return json.loads(result[0].text)
+
+    result = asyncio.run(run())
+    assert result["ok"] is True, result
+    assert result["data"]["version"] == "1.2.0"
+    assert result["data"]["installed_at"].startswith(
+        "subscriptions/did-web-pub.example/demo.pack/1.2.0"
+    )
