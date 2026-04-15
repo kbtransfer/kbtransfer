@@ -69,6 +69,12 @@ class ScrubFinding:
     original: str
     placeholder: str
     page: str
+    # Span location within the post-substitution page text. None on legacy
+    # callers that constructed findings before the v0.2 location fields.
+    line_start: int | None = None
+    line_end: int | None = None
+    char_start: int | None = None
+    char_end: int | None = None
 
 
 @dataclass
@@ -87,6 +93,12 @@ def scrub_pages(pages: dict[str, str]) -> ScrubResult:
     Returns the transformed mapping alongside a list of findings.
     Placeholders (e.g. `<EMAIL_01>`) are stable: if the same email
     appears on two pages it gets the same placeholder in both.
+
+    Each finding carries 1-indexed line numbers and 0-indexed in-line
+    character offsets pointing at the placeholder span in the
+    *post-substitution* page text. Skill-driven LLM redaction
+    (`examples/skills/kb-distill/`) uses these to fetch tight context
+    windows instead of paraphrasing whole pages.
     """
     substitutions: dict[tuple[str, str], str] = {}
     counters: dict[str, int] = {}
@@ -97,25 +109,52 @@ def scrub_pages(pages: dict[str, str]) -> ScrubResult:
     # numbering even if the caller passes a dict with a different order.
     for page_path in sorted(pages):
         text = pages[page_path]
+        # Collect every match across all patterns first, in pre-substitution
+        # coordinates; resolve overlaps by "first pattern wins" (the spec
+        # ranks PII categories EMAIL > SSN > CC > PHONE > IP for a reason —
+        # a 9-digit SSN should never be reclassified as a phone fragment).
+        spans: list[tuple[int, int, str, str, str]] = []
         for category, prefix, pattern in _PATTERNS:
-            def _repl(match: re.Match[str]) -> str:
+            for match in pattern.finditer(text):
+                start, end = match.start(), match.end()
+                if any(s < end and start < e for s, e, *_ in spans):
+                    continue
                 raw = match.group(0)
                 key = (prefix, raw)
                 if key not in substitutions:
                     counters[prefix] = counters.get(prefix, 0) + 1
                     substitutions[key] = f"<{prefix}_{counters[prefix]:02d}>"
-                placeholder = substitutions[key]
-                findings.append(
-                    ScrubFinding(
-                        category=category,
-                        original=raw,
-                        placeholder=placeholder,
-                        page=page_path,
-                    )
-                )
-                return placeholder
+                spans.append((start, end, category, prefix, substitutions[key]))
+        spans.sort(key=lambda s: s[0])
 
-            text = pattern.sub(_repl, text)
-        out[page_path] = text
+        result_parts: list[str] = []
+        cursor = 0
+        delta = 0
+        for start, end, category, _prefix, placeholder in spans:
+            result_parts.append(text[cursor:start])
+            new_start = start + delta
+            new_end = new_start + len(placeholder)
+            output_so_far = "".join(result_parts) + placeholder
+            line_start = output_so_far.count("\n", 0, new_start) + 1
+            line_end = output_so_far.count("\n", 0, new_end) + 1
+            char_start = new_start - (output_so_far.rfind("\n", 0, new_start) + 1)
+            char_end = new_end - (output_so_far.rfind("\n", 0, new_end) + 1)
+            result_parts.append(placeholder)
+            findings.append(
+                ScrubFinding(
+                    category=category,
+                    original=text[start:end],
+                    placeholder=placeholder,
+                    page=page_path,
+                    line_start=line_start,
+                    line_end=line_end,
+                    char_start=char_start,
+                    char_end=char_end,
+                )
+            )
+            cursor = end
+            delta += len(placeholder) - (end - start)
+        result_parts.append(text[cursor:])
+        out[page_path] = "".join(result_parts)
 
     return ScrubResult(pages=out, findings=findings)

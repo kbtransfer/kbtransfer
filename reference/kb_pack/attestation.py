@@ -88,6 +88,7 @@ def build_redaction(
     categories_redacted: list[str] | None = None,
     human_review: dict[str, Any] | None = None,
     adversarial_verification: dict[str, Any] | None = None,
+    llm_assisted_by: dict[str, Any] | None = None,
     issued_at: str | None = None,
 ) -> dict[str, Any]:
     if not residual_risk_notes:
@@ -104,6 +105,14 @@ def build_redaction(
         doc["human_review"] = dict(human_review)
     if adversarial_verification is not None:
         doc["adversarial_verification"] = dict(adversarial_verification)
+    if llm_assisted_by is not None:
+        # Transparency field: when an agent skill (single-model team-tier
+        # pipeline or dual-model enterprise pipeline) drove paraphrase /
+        # redaction passes via an LLM, the skill records its model
+        # identity, iteration count, and (for dual-model) the verifier
+        # model. Consumers can then weigh the attestation knowing whether
+        # an LLM rewrote the content vs whether a human did.
+        doc["llm_assisted_by"] = dict(llm_assisted_by)
     return doc
 
 

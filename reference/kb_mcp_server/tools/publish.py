@@ -107,6 +107,7 @@ def _populate_attestations(
         "distiller_mode", redaction_level
     )
     policy_version = policy.get("policy_version", "kbtransfer/0.1")
+    llm_assisted_by = report.get("llm_assisted_by")
     red = build_redaction(
         pack_ref=pack_ref,
         content_root=placeholder_root,
@@ -116,6 +117,7 @@ def _populate_attestations(
         policy_version=policy_version,
         residual_risk_notes=residual,
         categories_redacted=categories,
+        llm_assisted_by=llm_assisted_by,
     )
     (atts_dir / "redaction.json").write_text(json.dumps(red), encoding="utf-8")
 
