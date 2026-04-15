@@ -29,6 +29,7 @@ from . import (
     registry_describe as _registry_describe,
     registry_resolve as _registry_resolve,
     registry_search as _registry_search,
+    registry_submit as _registry_submit,
     search as _search,
     subscribe as _subscribe,
     verify as _verify,
@@ -53,6 +54,7 @@ _MODULES = [
     _registry_describe,
     _registry_resolve,
     _registry_search,
+    _registry_submit,
 ]
 
 TOOLS: list[types.Tool] = [mod.TOOL for mod in _MODULES]

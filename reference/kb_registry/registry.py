@@ -10,17 +10,17 @@ verification against the index-declared hash. Consumers use
 from __future__ import annotations
 
 import hashlib
+import json
 import shutil
 import tarfile
 import tempfile
 import urllib.request
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import unquote, urlparse
-
-import json
 
 from kb_registry.index import build_index, read_index
 from kb_registry.semver import highest_matching
@@ -330,6 +330,104 @@ class HttpsRegistry(Registry):
         raise RegistryError(
             "HTTPS registries are read-only; rebuild at the source and redeploy"
         )
+
+    # ── RFC-0002: submit path ──────────────────────────────────────
+    def submit(
+        self,
+        tarball_path: Path,
+        *,
+        notes: str = "",
+        bearer_token: str | None = None,
+    ) -> dict[str, Any]:
+        tarball_path = Path(tarball_path)
+        if not tarball_path.is_file():
+            raise RegistryError(f"tarball not found: {tarball_path}")
+        if tarball_path.stat().st_size > self._max_bytes:
+            raise RegistryError(
+                f"tarball exceeds client max_bytes cap {self._max_bytes}"
+            )
+        body = tarball_path.read_bytes()
+        response = self._http_submit(
+            f"{self._base}/v0.1/submit",
+            tar_bytes=body,
+            filename=tarball_path.name,
+            notes=notes,
+            bearer_token=bearer_token,
+        )
+        # Invalidate the cached index so a follow-up resolve sees the new
+        # version (assuming the registry committed it in auto mode).
+        self._index_cache = None
+        return response
+
+    def _http_submit(
+        self,
+        url: str,
+        *,
+        tar_bytes: bytes,
+        filename: str,
+        notes: str,
+        bearer_token: str | None,
+    ) -> dict[str, Any]:
+        boundary = f"----kbtransfer-{uuid.uuid4().hex}"
+        body = _build_multipart(
+            boundary=boundary,
+            tar_bytes=tar_bytes,
+            filename=filename,
+            notes=notes,
+        )
+        headers = {
+            "User-Agent": "kbtransfer/0.1",
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+        }
+        if bearer_token:
+            headers["Authorization"] = f"Bearer {bearer_token}"
+        request = urllib.request.Request(url, data=body, headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=self._timeout) as resp:
+                raw = resp.read()
+                status = resp.status
+        except HTTPError as exc:
+            # Even on 4xx we still want the structured error body back.
+            raw = exc.read() if hasattr(exc, "read") else b""
+            status = exc.code
+        except URLError as exc:
+            raise RegistryError(f"submit HTTPS POST failed: {exc}") from exc
+        try:
+            parsed = json.loads(raw.decode("utf-8")) if raw else {}
+        except json.JSONDecodeError as exc:
+            raise RegistryError(
+                f"registry returned non-JSON response (HTTP {status}): {raw[:200]!r}"
+            ) from exc
+        if not isinstance(parsed, dict):
+            raise RegistryError(
+                f"registry submit response was not a JSON object: {parsed!r}"
+            )
+        return parsed
+
+
+def _build_multipart(
+    *,
+    boundary: str,
+    tar_bytes: bytes,
+    filename: str,
+    notes: str,
+) -> bytes:
+    crlf = b"\r\n"
+    parts: list[bytes] = []
+    if notes:
+        parts.append(f"--{boundary}".encode())
+        parts.append(b'Content-Disposition: form-data; name="notes"')
+        parts.append(b"")
+        parts.append(notes.encode("utf-8"))
+    parts.append(f"--{boundary}".encode())
+    parts.append(
+        f'Content-Disposition: form-data; name="tarball"; filename="{filename}"'.encode()
+    )
+    parts.append(b"Content-Type: application/x-tar")
+    parts.append(b"")
+    header = crlf.join(parts) + crlf
+    trailer = crlf + f"--{boundary}--".encode() + crlf
+    return header + tar_bytes + trailer
 
 
 def open_registry(url: str) -> Registry:

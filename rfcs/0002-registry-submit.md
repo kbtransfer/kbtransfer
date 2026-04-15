@@ -1,12 +1,13 @@
 ---
 rfc: 0002
 title: registry/submit/0.1 — permissionless wire-level publish
-status: draft
+status: shipped
 phase: 4
 depth: medium
 breaks_v1_decision: none
 depends_on: [0001]
 authors: [kbtransfer-core]
+shipped_at: 2026-04-15
 ---
 
 # RFC-0002 — `registry/submit/0.1` MCP tool

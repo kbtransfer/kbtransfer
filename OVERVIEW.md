@@ -409,8 +409,11 @@ The MCP API is identical across all three; only the
 ### v2 extensions (RFC track)
 
 - **RFC-0001** — `https://` + `git+https://` transports. **Shipped** in `HttpsRegistry` (`reference/kb_registry/registry.py`).
-- **RFC-0002** — `kb/registry_submit/0.1` MCP tool over the wire,
-  jointly with the existing PR-based curated path. Phase 4.
+- **RFC-0002** — `kb/registry_submit/0.1` MCP tool + `POST /v0.1/submit`
+  wire endpoint. **Shipped** in `reference/kb_registry_server/` +
+  `examples/sample-registry-http/` with `kb/publish/0.1` optionally
+  pushing to a remote registry via `submit_to_registry`. Jointly
+  closes Phase 4 with RFC-0001 (`reports/07-rfc0002-registry-submit.md`).
 - **RFC-0005** — Federation graph: `federation.json` declares
   mirrors + endorsements + failover; consumer policy chooses
   whether to honor it. Phase 6.

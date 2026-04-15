@@ -40,7 +40,8 @@ TOOL = types.Tool(
         "Seal drafts/<pack_id>/ into a signed pack tarball under published/. "
         "Reads .distill-report.json to populate the redaction attestation; "
         "the other three attestations are filled from the manifest + default "
-        "license from policy.yaml."
+        "license from policy.yaml. Optionally pushes the sealed tarball to "
+        "an HTTPS registry via RFC-0002 submit when submit_to_registry is set."
     ),
     inputSchema={
         "type": "object",
@@ -50,6 +51,18 @@ TOOL = types.Tool(
                 "type": "number",
                 "description": "Optional evaluator composite score to record.",
                 "default": 0.0,
+            },
+            "submit_to_registry": {
+                "type": "string",
+                "description": (
+                    "Optional https:// or git+https:// registry URL. When "
+                    "set, the sealed tarball is POSTed to the registry's "
+                    "/v0.1/submit endpoint after local publish succeeds."
+                ),
+            },
+            "submit_bearer_token": {
+                "type": "string",
+                "description": "Required if submit_to_registry is a private-tier registry.",
             },
         },
         "required": ["pack_id"],
@@ -256,17 +269,76 @@ async def HANDLER(root: Path, arguments: dict[str, Any]) -> list[types.TextConte
     version = manifest.get("version", "0.0.0")
     tar_path = _make_tarball(draft_dir, root / "published", pack_id, version)
 
-    return ok(
-        {
-            "pack_id": pack_id,
-            "version": version,
-            "content_root": result.content_root,
-            "pack_root": result.pack_root,
-            "signed_draft": f"drafts/{pack_id}",
-            "tarball": str(tar_path.relative_to(root)),
-            "attestations": {
-                kind: str(path.relative_to(root))
-                for kind, path in result.attestation_paths.items()
-            },
+    payload: dict[str, Any] = {
+        "pack_id": pack_id,
+        "version": version,
+        "content_root": result.content_root,
+        "pack_root": result.pack_root,
+        "signed_draft": f"drafts/{pack_id}",
+        "tarball": str(tar_path.relative_to(root)),
+        "attestations": {
+            kind: str(path.relative_to(root))
+            for kind, path in result.attestation_paths.items()
+        },
+    }
+
+    submit_url = arguments.get("submit_to_registry")
+    if isinstance(submit_url, str) and submit_url:
+        payload["submission"] = _submit_to_registry(
+            submit_url,
+            tar_path,
+            bearer_token=arguments.get("submit_bearer_token"),
+        )
+
+    return ok(payload)
+
+
+def _submit_to_registry(
+    registry_url: str,
+    tar_path: Path,
+    *,
+    bearer_token: str | None,
+) -> dict[str, Any]:
+    from kb_registry import HttpsRegistry, RegistryError, open_registry
+
+    try:
+        registry = open_registry(registry_url)
+    except RegistryError as exc:
+        return {
+            "ok": False,
+            "registry_url": registry_url,
+            "error_code": "registry_open_failed",
+            "error_message": str(exc),
         }
+    if not isinstance(registry, HttpsRegistry):
+        return {
+            "ok": False,
+            "registry_url": registry_url,
+            "error_code": "transport_unsupported",
+            "error_message": "submit requires https:// or git+https:// registry URL",
+        }
+    try:
+        response = registry.submit(tar_path, bearer_token=bearer_token)
+    except RegistryError as exc:
+        return {
+            "ok": False,
+            "registry_url": registry_url,
+            "error_code": "registry_submit_failed",
+            "error_message": str(exc),
+        }
+    return {
+        "ok": bool(response.get("accepted")),
+        "registry_url": registry_url,
+        "response": response,
+        **({"error_code": "registry_rejected", "error_message": _format_errors(response)}
+           if not response.get("accepted") else {}),
+    }
+
+
+def _format_errors(response: dict[str, Any]) -> str:
+    errs = response.get("errors") or []
+    if not errs:
+        return "registry rejected the submission"
+    return "; ".join(
+        f"[{e.get('check', '?')}] {e.get('message', '?')}" for e in errs
     )

@@ -40,13 +40,16 @@ over the public internet, submittable without a git PR." After Phase 4 a
 publisher SHOULD be able to call `kb/publish/0.1` and have the pack land
 in a remote registry without the operator merging anything by hand.
 
-| RFC      | Topic                                | Depth  |
-|----------|--------------------------------------|--------|
-| RFC-0001 | `https://` / `git+https://` transport | medium |
-| RFC-0002 | `registry/submit/0.1` MCP tool        | medium |
+| RFC      | Topic                                 | Depth  | Status  |
+|----------|---------------------------------------|--------|---------|
+| RFC-0001 | `https://` / `git+https://` transport | medium | shipped |
+| RFC-0002 | `registry/submit/0.1` MCP tool        | medium | shipped |
 
-**Phase gate:** `examples/sample-registry/` demo runs end-to-end against
-a hosted instance — submit → verify → fetch — without touching git.
+**Phase gate:** `examples/sample-registry-http/` FastAPI app runs
+end-to-end against a hosted instance — submit → verify → fetch —
+without touching git. Proven locally via
+`tests/test_sample_registry_http.py` in the 2026-04-15 dogfood
+(`reports/07-rfc0002-registry-submit.md`).
 
 ### Phase 5 — Identity & time
 

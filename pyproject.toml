@@ -30,6 +30,13 @@ dev = [
     "pytest-asyncio>=0.23",
     "ruff>=0.4",
     "mypy>=1.8",
+    "httpx>=0.27",
+    "fastapi>=0.110",
+]
+server = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "python-multipart>=0.0.9",
 ]
 
 [project.scripts]
@@ -47,6 +54,7 @@ packages = [
     "reference/kb_pack",
     "reference/kb_distiller",
     "reference/kb_registry",
+    "reference/kb_registry_server",
 ]
 
 [tool.ruff]

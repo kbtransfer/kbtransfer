@@ -1,0 +1,16 @@
+version: "3.9"
+
+services:
+  registry:
+    build:
+      context: ../..
+      dockerfile: examples/sample-registry-http/Dockerfile
+    environment:
+      KBTRANSFER_REGISTRY_ROOT: /srv/registry
+      KBTRANSFER_TRUST_ROLE: open
+      KBTRANSFER_COMMIT_MODE: auto
+      KBTRANSFER_REGISTRY_ID: did:web:registry.local
+    volumes:
+      - ./data:/srv/registry:rw
+    ports:
+      - "8080:8080"
