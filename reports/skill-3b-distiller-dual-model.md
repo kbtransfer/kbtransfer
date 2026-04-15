@@ -10,8 +10,9 @@ enforcement that makes the family-difference invariant tamper-proof.
 classifier tests + 4 publish enforcement tests); 4 adversarial canary
 tests skipped pending live-LLM harness.
 
-This is the "C-aşamalı, ikinci yarısı" deliverable from the v2
-distiller plan locked on 2026-04-15. With 3.a + 3.b shipped, both
+This is the "decision-C staged plan, second half" deliverable from
+the v2 distiller design locked on 2026-04-15. With 3.a + 3.b shipped,
+both
 single-model and dual-model variants from spec §10 now have
 reference implementations. The spec calls out dual-model adversarial
 verification as the bias-isolation enablement for the patent claim;
@@ -82,16 +83,16 @@ for the v0.2 spec re-publication tracked in `ROADMAP-v2.md`.
 
 Per the 2026-04-15 design Q&A:
 
-| Karar       | Choice                                       | Where it shows up |
+| Decision    | Choice                                       | Where it shows up |
 |-------------|----------------------------------------------|-------------------|
-| 1 — Tier    | C — aşamalı; 3.b dual-model after 3.a        | This skill exists alongside kb-distill, builds on it |
+| 1 — Tier    | C — staged; 3.b dual-model after 3.a         | This skill exists alongside kb-distill, builds on it |
 | 2 — Konum   | A — `examples/skills/kb-distill-adversarial/` | The directory itself, repo-tracked |
 | 3 — Loop    | A+D hybrid (from 3.a) + NEW verifier loop    | SKILL.md §"The loop" Steps 1-2 reuse 3.a; Step 2 NEW |
 | 4 — Verifier | C — configurable, default Haiku, env override | SKILL.md §"Preconditions" + family classification table; family.py prefix list |
 | 5 — Tests   | C+D — invariants + dogfood report             | This report + tests/test_distiller_family.py + extension to test_distiller_skill.py |
 | 6 — Server  | B+D — locations (3.a) + adversarial_verification block (3.b) | scrubber.py (3.a) + attestation.py + publish.py (both phases) |
 
-All six karar locked; nothing reopened during build.
+All six decisions locked; nothing reopened during build.
 
 ---
 
@@ -306,7 +307,7 @@ Distiller skill 3.b dual-model adversarial: ✓ this commit
 
 Both options the user picked on 2026-04-15 — v2 roadmap (Option 2)
 and distiller-skill engineering (Option 3) — are now fully closed.
-The four masada bekleyen items from `next_steps_paused_2026_04_14.md`
+The four candidates on the table from `next_steps_paused_2026_04_14.md`
 have been narrowed: Option 1 (GitHub push) and Option 4 (USPTO
 provisional) remain as the natural next decisions.
 

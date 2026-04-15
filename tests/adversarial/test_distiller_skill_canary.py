@@ -13,8 +13,8 @@ then probe the rewritten pages with a LLM verifier asking it to
 recover the original canary identities. Pass = verifier cannot
 recover any canary above the policy's confidence threshold.
 
-Dual-model variant (RFC-Karar 4/B inter-provider verifier) lives in a
-sibling test once Phase 3.b ships.
+Dual-model variant (design decision 4/B inter-provider verifier)
+lives in a sibling test once Phase 3.b ships.
 """
 
 from __future__ import annotations

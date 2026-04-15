@@ -55,7 +55,7 @@ You then decide whether to call `kb/publish/0.1`.
   needed; just call `kb/distill/0.1` directly.
 - **Not for enterprise tier.** `dual-model` mode requires a verifier
   model from a different family running adversarially against the
-  redactor's output (spec §10 + RFC-Karar from 2026-04-15 Karar 4/C).
+  redactor's output (spec §10 + design decision 4/C from 2026-04-15).
   That is a separate skill currently under design as `kb-distill-adversarial`.
 - **Not a substitute for human review** when stakes are high.
   Single-model paraphrase is good at structured PII and obvious soft

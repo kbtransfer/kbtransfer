@@ -10,9 +10,9 @@ the LLM loop by hand.
 deterministic invariants); 2 adversarial canary tests skipped pending
 live-LLM harness.
 
-This is the "C-aşamalı, ilk yarısı" deliverable from the v2 distiller
-plan locked on 2026-04-15. The dual-model adversarial sibling (3.b)
-is not in this report.
+This is the "decision-C staged plan, first half" deliverable from the
+v2 distiller design locked on 2026-04-15. The dual-model adversarial
+sibling (3.b) is not in this report.
 
 ---
 
@@ -58,9 +58,9 @@ re-publication tracked in `ROADMAP-v2.md`.
 
 Per the 2026-04-15 design Q&A:
 
-| Karar       | Choice                                       | Where it shows up |
+| Decision    | Choice                                       | Where it shows up |
 |-------------|----------------------------------------------|-------------------|
-| 1 — Tier    | C — aşamalı; 3.a single-model first          | SKILL.md preconditions §3 limit to team / single-model |
+| 1 — Tier    | C — staged; 3.a single-model first           | SKILL.md preconditions §3 limit to team / single-model |
 | 2 — Konum   | A — `examples/skills/kb-distill/`             | The directory itself, repo-tracked |
 | 3 — Loop    | A+D hybrid: strict regex loop + pass-2 review | SKILL.md §"The loop" Steps 2 + 3 |
 | 4 — Verifier | C — configurable; deferred to 3.b            | SKILL.md "What this skill is NOT" §"Not for enterprise" |
@@ -172,7 +172,7 @@ silently triggered publish would break that.
 
 3.b is the dual-model enterprise variant. From the design Q&A:
 
-- **Karar 4/C:** verifier model is configurable. Default
+- **Decision 4/C:** verifier model is configurable. Default
   `claude-haiku-4-5` (intra-Claude-family pragmatic split);
   `VERIFIER_MODEL=openai:gpt-4o` style override for true
   inter-provider isolation, which is the patent claim's "bias
