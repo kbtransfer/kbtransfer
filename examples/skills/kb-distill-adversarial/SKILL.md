@@ -64,8 +64,11 @@ adds the verifier loop on top:
    covers smoke-test scenarios but does NOT satisfy the
    `adversarial_verifier_model_family_must_differ: true` policy that
    the enterprise template ships with. For real enterprise use, set
-   `VERIFIER_MODEL` to a different-family model id. Recognized
-   prefixes (see `reference/kb_distiller/family.py`):
+   `VERIFIER_MODEL` to a different-family model id. For local Ollama
+   setup, see the companion
+   [`OLLAMA-INTEGRATION.md`](./OLLAMA-INTEGRATION.md) in this
+   directory. Recognized prefixes (see
+   `reference/kb_distiller/family.py`):
    - `gpt-*`, `o1-*`, `o3-*`, or `openai:*` — OpenAI family
    - `gemini-*`, `palm-*`, or `google:*` — Google family
    - `llama-*` or `meta:*` — Meta family
