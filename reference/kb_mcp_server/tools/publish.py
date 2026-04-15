@@ -283,14 +283,32 @@ async def HANDLER(root: Path, arguments: dict[str, Any]) -> list[types.TextConte
     }
 
     submit_url = arguments.get("submit_to_registry")
+    submit_token = arguments.get("submit_bearer_token")
     if isinstance(submit_url, str) and submit_url:
         payload["submission"] = _submit_to_registry(
             submit_url,
             tar_path,
-            bearer_token=arguments.get("submit_bearer_token"),
+            bearer_token=submit_token,
         )
+    else:
+        auto_push = _resolve_auto_push(policy)
+        if auto_push:
+            # Per-registry tokens aren't represented in policy.yaml today;
+            # auto_push is aimed at open/consortium targets. Use explicit
+            # submit_to_registry for private-tier destinations.
+            payload["submissions"] = [
+                _submit_to_registry(url, tar_path, bearer_token=None)
+                for url in auto_push
+            ]
 
     return ok(payload)
+
+
+def _resolve_auto_push(policy: dict[str, Any]) -> list[str]:
+    raw = ((policy.get("publisher") or {}).get("auto_push") or [])
+    if not isinstance(raw, list):
+        return []
+    return [item for item in raw if isinstance(item, str) and item]
 
 
 def _submit_to_registry(

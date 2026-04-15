@@ -38,3 +38,6 @@ publisher:
   distiller_mode: "single-model"
   default_license: "Apache-2.0"
   adversarial_verification_required: false
+  # Auto-push to these registry URLs after each successful publish.
+  # See individual.yaml for the open/consortium-only caveat.
+  auto_push: []

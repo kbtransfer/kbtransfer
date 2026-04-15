@@ -41,3 +41,7 @@ publisher:
   default_license: "LicenseRef-internal-commercial"
   adversarial_verification_required: true
   adversarial_verifier_model_family_must_differ: true
+  # Auto-push to these registry URLs after each successful publish.
+  # Enterprise deployments typically push to a private registry that
+  # requires a bearer token; use explicit submit_to_registry for those.
+  auto_push: []

@@ -34,3 +34,9 @@ publisher:
   distiller_mode: "manual"      # manual | single-model | dual-model
   default_license: "Apache-2.0"
   adversarial_verification_required: false
+  # Optional list of https:// / git+https:// registry URLs to push to
+  # automatically after kb/publish/0.1 succeeds. Each receives the same
+  # signed tarball; per-registry bearer tokens are not represented here
+  # (open/consortium targets only — use an explicit submit_to_registry
+  # argument for private-tier registries).
+  auto_push: []
