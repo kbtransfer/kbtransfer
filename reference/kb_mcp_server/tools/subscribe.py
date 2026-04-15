@@ -25,7 +25,6 @@ Flow:
 
 from __future__ import annotations
 
-import os
 import shutil
 import tarfile
 import tempfile
@@ -39,6 +38,10 @@ from kb_mcp_server.envelope import error, ok
 from kb_mcp_server.publisher_context import (
     PublisherContextError,
     load_publisher_context,
+)
+from kb_mcp_server.subscription_fs import (
+    make_tree_read_only,
+    make_tree_writable,
 )
 from kb_mcp_server.trust_store import (
     register_publisher_key,
@@ -116,34 +119,6 @@ def _read_manifest(pack_dir: Path) -> dict[str, Any]:
 
 def _bundled_pubkey_hex(pack_dir: Path) -> str:
     return (pack_dir / "signatures" / "publisher.pubkey").read_bytes().hex()
-
-
-def _chmod_tree_read_only(root: Path) -> None:
-    # Defense-in-depth atop the MCP server's write-rejection for
-    # `subscriptions/*`: make the installed pack physically read-only so
-    # an unrelated tool with filesystem access cannot silently mutate it.
-    for dirpath, dirnames, filenames in os.walk(root):
-        for name in filenames:
-            os.chmod(Path(dirpath) / name, 0o444)
-        for name in dirnames:
-            os.chmod(Path(dirpath) / name, 0o555)
-    os.chmod(root, 0o555)
-
-
-def _chmod_tree_writable(root: Path) -> None:
-    # Restore write bits so `shutil.rmtree` can replace a previous
-    # read-only install during re-subscribe.
-    for dirpath, _dirnames, filenames in os.walk(root):
-        os.chmod(dirpath, 0o755)
-        for name in filenames:
-            try:
-                os.chmod(Path(dirpath) / name, 0o644)
-            except OSError:
-                pass
-    try:
-        os.chmod(root, 0o755)
-    except OSError:
-        pass
 
 
 async def HANDLER(root: Path, arguments: dict[str, Any]) -> list[types.TextContent]:
@@ -263,11 +238,11 @@ async def HANDLER(root: Path, arguments: dict[str, Any]) -> list[types.TextConte
             / version
         )
         if subscription_root.exists():
-            _chmod_tree_writable(subscription_root)
+            make_tree_writable(subscription_root)
             shutil.rmtree(subscription_root)
         subscription_root.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(pack_dir, subscription_root)
-        _chmod_tree_read_only(subscription_root)
+        make_tree_read_only(subscription_root)
 
         return ok(
             {

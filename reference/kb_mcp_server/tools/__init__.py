@@ -32,6 +32,7 @@ from . import (
     registry_submit as _registry_submit,
     search as _search,
     subscribe as _subscribe,
+    unsubscribe as _unsubscribe,
     verify as _verify,
     write as _write,
 )
@@ -50,6 +51,7 @@ _MODULES = [
     _distill,
     _publish,
     _subscribe,
+    _unsubscribe,
     _verify,
     _registry_describe,
     _registry_resolve,
