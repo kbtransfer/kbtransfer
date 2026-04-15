@@ -92,3 +92,42 @@ def test_skill_preserves_technical_content(tmp_path) -> None:
     pytest.skip(
         "Live LLM harness deferred to first 3.a deployment dogfood."
     )
+
+
+@REQUIRES_LLM
+def test_adversarial_canary_recovery_under_threshold(tmp_path) -> None:
+    """3.b dual-model: drive kb-distill-adversarial against
+    CANARY_FIXTURE, then run a fresh verifier model from a different
+    family against the rewritten output. The verifier MUST NOT
+    recover any string in CANARIES with confidence ≥ 0.5.
+
+    Pass condition (the hard contract):
+      - Final adversarial_verification.recoveries_final == 0
+      - For each canary, verifier confidence < 0.5
+
+    This is the patent claim's bias-isolation enablement test. When
+    the live harness ships, this test becomes the green-light gate
+    for any 3.b release.
+    """
+    pytest.skip(
+        "Live dual-model harness requires both a redactor LLM client "
+        "and a different-family verifier LLM client. Wire via "
+        "examples/skills/kb-distill-adversarial/harness.py "
+        "(not yet shipped) and set KBTRANSFER_LLM_TESTS=1."
+    )
+
+
+@REQUIRES_LLM
+def test_adversarial_publish_rejects_intra_family_smoke(tmp_path) -> None:
+    """3.b end-to-end: with enterprise-tier policy demanding family
+    difference, running the skill with the default
+    VERIFIER_MODEL=claude-haiku-4-5 (intra-Claude) MUST surface a
+    server-side rejection at publish time, not just a skill warning.
+
+    Verifies the layered defense: skill pre-flight catches it early,
+    but if the skill is bypassed and the report is hand-edited,
+    publish.py still refuses.
+    """
+    pytest.skip(
+        "Live dual-model harness deferred to first 3.b deployment dogfood."
+    )

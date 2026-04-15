@@ -195,6 +195,162 @@ def test_publish_threads_llm_assisted_by_from_report(tmp_path: Path) -> None:
     assert written["llm_assisted_by"]["residual_review_pass2"] is True
 
 
+# ── publish.py threads adversarial_verification + enforces family diff ─
+
+def _adversarial_block(redactor: str, verifier: str) -> dict:
+    return {
+        "redactor_model": redactor,
+        "verifier_model": verifier,
+        "redactor_family": "anthropic",
+        "verifier_family": "openai",
+        "verifier_iterations": 2,
+        "probes_per_iteration": 25,
+        "recoveries_initial": 4,
+        "recoveries_final": 0,
+        "recovery_threshold": 0.5,
+        "started_at": "2026-04-15T14:01:30Z",
+        "completed_at": "2026-04-15T14:03:18Z",
+        "policy_family_must_differ": True,
+    }
+
+
+def _seed_dual_model_draft(
+    tmp_path: Path,
+    *,
+    adversarial: dict | None,
+    policy_family_must_differ: bool,
+) -> tuple[Path, dict, dict]:
+    draft = tmp_path / "drafts" / "demo.pack"
+    (draft / "pages").mkdir(parents=True)
+    (draft / "attestations").mkdir(parents=True)
+    (draft / "pages" / "01.md").write_text("hi\n", encoding="utf-8")
+    (draft / "pack.manifest.yaml").write_text(
+        "pack_id: demo.pack\nversion: 1.0.0\n", encoding="utf-8"
+    )
+    report = {
+        "mode": "dual-model",
+        "redaction_level": "strict",
+        "categories_redacted": ["client.organization"],
+        "residual_risk_notes": ["Stylometric leaks possible."],
+        "llm_assisted_by": {
+            "model": "claude-opus-4-6",
+            "mode": "dual-model",
+            "skill": "kb-distill-adversarial@0.1",
+        },
+    }
+    if adversarial is not None:
+        report["adversarial_verification"] = adversarial
+    (draft / ".distill-report.json").write_text(json.dumps(report), encoding="utf-8")
+
+    manifest = {"pack_id": "demo.pack", "version": "1.0.0"}
+    policy = {
+        "publisher": {
+            "distiller_mode": "dual-model",
+            "adversarial_verifier_model_family_must_differ": policy_family_must_differ,
+        },
+        "policy_version": "kbtransfer/0.1",
+    }
+    return draft, manifest, policy
+
+
+def test_publish_threads_adversarial_verification_intact(tmp_path: Path) -> None:
+    """A correctly-stamped block (different families) survives the
+    publish round-trip byte-for-byte in the redaction attestation."""
+    from kb_mcp_server.tools.publish import _populate_attestations
+
+    block = _adversarial_block("claude-opus-4-6", "openai:gpt-4o")
+    draft, manifest, policy = _seed_dual_model_draft(
+        tmp_path, adversarial=block, policy_family_must_differ=True
+    )
+
+    _populate_attestations(
+        draft,
+        manifest=manifest,
+        policy=policy,
+        composite_score=0.0,
+        publisher_id="did:web:example.com",
+    )
+
+    written = json.loads((draft / "attestations" / "redaction.json").read_text())
+    assert written["adversarial_verification"] == block
+
+
+def test_publish_rejects_same_family_when_policy_demands_difference(
+    tmp_path: Path,
+) -> None:
+    """The skill might lie (or get the env var wrong); publish must
+    refuse to seal a fraudulent block. Spec §10 enforcement."""
+    from kb_mcp_server.tools.publish import _populate_attestations
+    from kb_pack import BuildError
+
+    block = _adversarial_block("claude-opus-4-6", "claude-haiku-4-5")
+    block["redactor_family"] = "anthropic"
+    block["verifier_family"] = "anthropic"
+    draft, manifest, policy = _seed_dual_model_draft(
+        tmp_path, adversarial=block, policy_family_must_differ=True
+    )
+
+    with pytest.raises(BuildError, match="same family"):
+        _populate_attestations(
+            draft,
+            manifest=manifest,
+            policy=policy,
+            composite_score=0.0,
+            publisher_id="did:web:example.com",
+        )
+
+
+def test_publish_accepts_same_family_when_policy_does_not_demand(
+    tmp_path: Path,
+) -> None:
+    """Without the policy flag, intra-family verification (e.g. team
+    tier doing a smoke-test dual pass) is allowed. The block is still
+    threaded through; consumers see family identities and can make
+    their own trust call."""
+    from kb_mcp_server.tools.publish import _populate_attestations
+
+    block = _adversarial_block("claude-opus-4-6", "claude-haiku-4-5")
+    block["redactor_family"] = "anthropic"
+    block["verifier_family"] = "anthropic"
+    block["policy_family_must_differ"] = False
+    draft, manifest, policy = _seed_dual_model_draft(
+        tmp_path, adversarial=block, policy_family_must_differ=False
+    )
+
+    _populate_attestations(
+        draft,
+        manifest=manifest,
+        policy=policy,
+        composite_score=0.0,
+        publisher_id="did:web:example.com",
+    )
+
+    written = json.loads((draft / "attestations" / "redaction.json").read_text())
+    assert written["adversarial_verification"]["verifier_family"] == "anthropic"
+
+
+def test_publish_rejects_when_block_missing_model_ids(tmp_path: Path) -> None:
+    """If policy demands family difference but the skill stamps a
+    block without model ids, publish refuses — there is nothing to
+    classify."""
+    from kb_mcp_server.tools.publish import _populate_attestations
+    from kb_pack import BuildError
+
+    block = {"verifier_iterations": 1, "recoveries_final": 0}
+    draft, manifest, policy = _seed_dual_model_draft(
+        tmp_path, adversarial=block, policy_family_must_differ=True
+    )
+
+    with pytest.raises(BuildError, match="redactor_model or verifier_model"):
+        _populate_attestations(
+            draft,
+            manifest=manifest,
+            policy=policy,
+            composite_score=0.0,
+            publisher_id="did:web:example.com",
+        )
+
+
 def test_publish_omits_llm_assisted_by_when_report_lacks_it(tmp_path: Path) -> None:
     """Pre-skill (manual mode) drafts have no llm_assisted_by key.
     publish must not emit a stub block — absence is meaningful."""

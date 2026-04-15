@@ -19,6 +19,7 @@ from typing import Any
 import mcp.types as types
 import yaml
 
+from kb_distiller import ModelFamilyError, assert_different_families
 from kb_mcp_server.envelope import error, ok
 from kb_mcp_server.publisher_context import (
     PublisherContextError,
@@ -69,6 +70,34 @@ def _load_policy(root: Path) -> dict[str, Any]:
     return yaml.safe_load((root / ".kb" / "policy.yaml").read_text(encoding="utf-8"))
 
 
+def _enforce_verifier_family_policy(
+    block: dict[str, Any], policy: dict[str, Any]
+) -> None:
+    """If publisher policy demands a different model family for the
+    adversarial verifier, refuse to seal a redaction attestation whose
+    `adversarial_verification` block names two same-family models.
+
+    The skill cannot lie its way past this — even if it stamps a
+    fraudulent block, publish refuses. Spec §10 invariant.
+    """
+    if not policy.get("publisher", {}).get(
+        "adversarial_verifier_model_family_must_differ", False
+    ):
+        return
+    redactor = block.get("redactor_model")
+    verifier = block.get("verifier_model")
+    if not redactor or not verifier:
+        raise BuildError(
+            "policy demands adversarial_verifier_model_family_must_differ but "
+            "the .distill-report.json adversarial_verification block is "
+            "missing redactor_model or verifier_model."
+        )
+    try:
+        assert_different_families(redactor, verifier)
+    except ModelFamilyError as exc:
+        raise BuildError(str(exc)) from exc
+
+
 def _populate_attestations(
     draft_dir: Path,
     manifest: dict[str, Any],
@@ -108,6 +137,9 @@ def _populate_attestations(
     )
     policy_version = policy.get("policy_version", "kbtransfer/0.1")
     llm_assisted_by = report.get("llm_assisted_by")
+    adversarial_verification = report.get("adversarial_verification")
+    if adversarial_verification is not None:
+        _enforce_verifier_family_policy(adversarial_verification, policy)
     red = build_redaction(
         pack_ref=pack_ref,
         content_root=placeholder_root,
@@ -118,6 +150,7 @@ def _populate_attestations(
         residual_risk_notes=residual,
         categories_redacted=categories,
         llm_assisted_by=llm_assisted_by,
+        adversarial_verification=adversarial_verification,
     )
     (atts_dir / "redaction.json").write_text(json.dumps(red), encoding="utf-8")
 
