@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import stat
 from pathlib import Path
 
 import pytest
@@ -180,6 +182,75 @@ async def test_subscribe_enterprise_without_allowlist_rejects(tmp_path: Path) ->
     )
     assert sub_result["ok"] is False
     assert sub_result["error"]["code"] == "untrusted_publisher"
+
+
+async def _publish_tar(publisher: Path, pack_id: str = "example.p") -> Path:
+    (publisher / "wiki" / "patterns").mkdir(parents=True, exist_ok=True)
+    (publisher / "wiki" / "patterns" / "p.md").write_text(
+        "# Pattern\n\nBody.\n", encoding="utf-8"
+    )
+    await _call(
+        publisher,
+        "kb/draft_pack/0.1",
+        {
+            "pack_id": pack_id,
+            "title": "P",
+            "summary": "P.",
+            "source_pages": ["wiki/patterns/p.md"],
+        },
+    )
+    await _call(publisher, "kb/distill/0.1", {"pack_id": pack_id})
+    pub_result = await _call(publisher, "kb/publish/0.1", {"pack_id": pack_id})
+    return publisher / pub_result["data"]["tarball"]
+
+
+async def test_subscribe_installs_content_read_only(tmp_path: Path) -> None:
+    publisher = tmp_path / "pub-kb"
+    scaffold(root=publisher, tier="individual", publisher_id="did:web:pub.example")
+    tar_path = await _publish_tar(publisher)
+
+    consumer = tmp_path / "cons-kb"
+    scaffold(root=consumer, tier="individual", publisher_id="did:web:cons.example")
+    sub_result = await _call(
+        consumer, "kb/subscribe/0.1", {"source": str(tar_path)}
+    )
+    assert sub_result["ok"] is True, sub_result
+    install_root = consumer / sub_result["data"]["installed_at"]
+
+    world_writable = stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH
+    for dirpath, dirnames, filenames in os.walk(install_root):
+        for name in filenames:
+            mode = stat.S_IMODE(os.stat(Path(dirpath) / name).st_mode)
+            assert mode & world_writable == 0, (
+                f"file {Path(dirpath) / name} is writable: {oct(mode)}"
+            )
+        for name in dirnames:
+            mode = stat.S_IMODE(os.stat(Path(dirpath) / name).st_mode)
+            assert mode & world_writable == 0, (
+                f"dir {Path(dirpath) / name} is writable: {oct(mode)}"
+            )
+
+    install_mode = stat.S_IMODE(os.stat(install_root).st_mode)
+    assert install_mode & world_writable == 0
+
+
+async def test_resubscribe_replaces_read_only_install(tmp_path: Path) -> None:
+    publisher = tmp_path / "pub-kb"
+    scaffold(root=publisher, tier="individual", publisher_id="did:web:pub.example")
+    tar_path = await _publish_tar(publisher)
+
+    consumer = tmp_path / "cons-kb"
+    scaffold(root=consumer, tier="individual", publisher_id="did:web:cons.example")
+
+    first = await _call(consumer, "kb/subscribe/0.1", {"source": str(tar_path)})
+    assert first["ok"] is True, first
+
+    # The install is now read-only. A second subscribe against the same
+    # pack must still succeed — the tool is responsible for chmod-ing
+    # the previous install back to writable before replacing it.
+    second = await _call(consumer, "kb/subscribe/0.1", {"source": str(tar_path)})
+    assert second["ok"] is True, second
+    assert second["data"]["installed_at"] == first["data"]["installed_at"]
 
 
 async def test_search_across_mine_and_subscriptions(tmp_path: Path) -> None:

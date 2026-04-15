@@ -433,6 +433,16 @@ are tagged so the agent always knows: `tag: mine` vs
 `tag: from:did:web:smartchip.ie`. Nothing silently flows from one
 namespace to the other.
 
+**`publisher_did_safe` encoding.** Canonical DIDs (e.g.
+`did:web:smartchip.ie`) contain `:` which is an awkward path
+character. `kb_pack.did_to_safe_path` defines the one-way transform
+every tool uses: replace `:` and `/` with `-`; reject NUL, backslash,
+and control characters. So `did:web:smartchip.ie` →
+`did-web-smartchip.ie`. The transform is intentionally lossy — the
+directory name is not a canonical identifier. Consumers that need
+the original DID read `publisher.id` from the installed pack's
+`pack.manifest.yaml`, or `.kb/trust-store.yaml`.
+
 Consumption flow with verification:
 
 1. `kb/registry_search/0.1` — find candidates.

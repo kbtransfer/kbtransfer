@@ -63,6 +63,47 @@ _PATTERNS = [
 ]
 
 
+_FRONTMATTER_RE = re.compile(r"\A---\s*\n.*?\n---\s*(?:\n|$)", re.DOTALL)
+
+
+def _frontmatter_range(text: str) -> tuple[int, int] | None:
+    match = _FRONTMATTER_RE.match(text)
+    return (match.start(), match.end()) if match else None
+
+
+def _luhn_ok(digits: str) -> bool:
+    # Standard Luhn: right-to-left, double every second digit, sum mod 10.
+    total = 0
+    for i, ch in enumerate(reversed(digits)):
+        n = ord(ch) - 48  # '0' == 48
+        if i % 2 == 1:
+            n *= 2
+            if n > 9:
+                n -= 9
+        total += n
+    return total % 10 == 0
+
+
+def _accept_cc_match(
+    match: re.Match[str], text: str, fm_range: tuple[int, int] | None
+) -> bool:
+    # The CC regex matches any 13-19 digit run tolerating ` ` / `-`
+    # separators — the dogfood on 2026-04-15 showed this flags things
+    # like `§1, §2, ..., §14` and date concatenations. Two filters
+    # narrow the match back to plausible cards:
+    #   1) digits must pass the Luhn checksum (rejects most random runs);
+    #   2) spans inside YAML frontmatter are skipped entirely (metadata
+    #      timestamps and numeric id lists routinely hit the pattern).
+    if fm_range is not None:
+        fm_start, fm_end = fm_range
+        if match.start() >= fm_start and match.end() <= fm_end:
+            return False
+    digits = "".join(c for c in match.group(0) if c.isdigit())
+    if not (13 <= len(digits) <= 19):
+        return False
+    return _luhn_ok(digits)
+
+
 @dataclass
 class ScrubFinding:
     category: str
@@ -109,6 +150,7 @@ def scrub_pages(pages: dict[str, str]) -> ScrubResult:
     # numbering even if the caller passes a dict with a different order.
     for page_path in sorted(pages):
         text = pages[page_path]
+        fm_range = _frontmatter_range(text)
         # Collect every match across all patterns first, in pre-substitution
         # coordinates; resolve overlaps by "first pattern wins" (the spec
         # ranks PII categories EMAIL > SSN > CC > PHONE > IP for a reason —
@@ -116,6 +158,10 @@ def scrub_pages(pages: dict[str, str]) -> ScrubResult:
         spans: list[tuple[int, int, str, str, str]] = []
         for category, prefix, pattern in _PATTERNS:
             for match in pattern.finditer(text):
+                if category == CATEGORY_CC and not _accept_cc_match(
+                    match, text, fm_range
+                ):
+                    continue
                 start, end = match.start(), match.end()
                 if any(s < end and start < e for s, e, *_ in spans):
                     continue

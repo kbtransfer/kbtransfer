@@ -127,7 +127,12 @@ For verifier iteration `v` from 1 to 3:
    the default) against each probe. The verifier MUST be a fresh
    conversation each time — it sees only the page text and the
    probe, no skill instructions, no other context, no chain of
-   thought from the redactor.
+   thought from the redactor. Probe execution may use per-probe
+   Bash calls OR a batched helper script (e.g. a small Python
+   runner that loops over probes in one process); see
+   [`OLLAMA-INTEGRATION.md` §Batched Python alternative](./OLLAMA-INTEGRATION.md#batched-python-alternative-equivalent-often-faster).
+   Bias isolation (fresh request, single-page prompt, no shared
+   state across probes) is what matters, not the shell path.
 3. **Collect recoveries.** A "recovery" is any verifier response
    that returns a concrete answer (not "cannot tell") with
    confidence ≥ `policy.publisher.adversarial_recovery_threshold`

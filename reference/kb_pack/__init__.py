@@ -24,6 +24,7 @@ from kb_pack.attestation import (
 )
 from kb_pack.build import BuildError, BuildResult, build_pack
 from kb_pack.canonical import canonical_json
+from kb_pack.did import did_to_safe_path
 from kb_pack.lock import (
     Lock,
     build_lock_for,
@@ -86,6 +87,7 @@ __all__ = [
     "build_provenance",
     "build_redaction",
     "canonical_json",
+    "did_to_safe_path",
     "collect_pack_entries",
     "compute_roots",
     "load_attestation",

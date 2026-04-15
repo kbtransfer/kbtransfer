@@ -127,6 +127,46 @@ Key choices:
   the single redacted page — no skill context, no redactor reasoning,
   no other pages. Bias isolation depends on this.
 
+## Batched Python alternative (equivalent, often faster)
+
+Per-probe Bash curl is the reference pattern above because it is
+transparent and needs no extra tooling, but a batched Python helper
+that loops over probes in one process is an allowed alternative.
+Equivalence requires only that bias isolation is preserved: each
+probe is still a **fresh HTTP request** with a single-page prompt
+and no shared conversation state. A helper like:
+
+```python
+# /tmp/probe_runner.py — conceptual sketch, not a committed artifact
+import json, os, urllib.request
+for probe in probes:  # probes = [(page_id, category, page_text, question), ...]
+    body = json.dumps({
+        "model": os.environ["VERIFIER_MODEL"],
+        "prompt": build_prompt(probe.page_text, probe.question),
+        "stream": False,
+        "options": {"temperature": 0.1, "num_predict": 80},
+    }).encode()
+    req = urllib.request.Request(
+        "http://localhost:11434/api/generate",
+        data=body, headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(req) as r:
+        print(probe.page_id, probe.category,
+              json.loads(r.read())["response"])
+```
+
+…is acceptable, and the 2026-04-15 full-cycle dogfood found it
+faster in practice (fewer Bash tool permission prompts, no per-call
+shell startup). The skill does not prescribe either form; choose
+what the invoking agent finds clearer. Requirements that remain
+non-negotiable:
+
+- Fresh HTTP request per probe (no Ollama session reuse, no
+  cross-probe prompt concatenation).
+- Verifier sees only the page text and the probe question.
+- Results are collected and classified by the same recovery
+  threshold in either path.
+
 ## Probe categories
 
 The skill composes 3-5 probes per page from these categories (see
