@@ -20,6 +20,7 @@ import mcp.types as types
 from . import (
     distill as _distill,
     draft_pack as _draft_pack,
+    identity as _identity,
     ingest_source as _ingest_source,
     lint as _lint,
     policy_get as _policy_get,
@@ -27,13 +28,16 @@ from . import (
     publish as _publish,
     read as _read,
     registry_describe as _registry_describe,
+    registry_mirror as _registry_mirror,
     registry_resolve as _registry_resolve,
     registry_search as _registry_search,
     registry_submit as _registry_submit,
     search as _search,
     subscribe as _subscribe,
+    trust_add as _trust_add,
     unsubscribe as _unsubscribe,
     verify as _verify,
+    verify_all as _verify_all,
     write as _write,
 )
 
@@ -57,6 +61,10 @@ _MODULES = [
     _registry_resolve,
     _registry_search,
     _registry_submit,
+    _registry_mirror,
+    _trust_add,
+    _identity,
+    _verify_all,
 ]
 
 TOOLS: list[types.Tool] = [mod.TOOL for mod in _MODULES]
