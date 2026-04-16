@@ -1,6 +1,6 @@
 [project]
 name = "kbtransfer"
-version = "0.1.0"
+version = "0.1.1"
 description = "Open-protocol federated knowledge base between AI agents"
 readme = "README.md"
 requires-python = ">=3.11"
