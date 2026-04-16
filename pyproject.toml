@@ -4,7 +4,8 @@ version = "0.1.0"
 description = "Open-protocol federated knowledge base between AI agents"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
+license-files = ["LICENSE-APACHE-2.0", "LICENSE-CC-BY-SA-4.0"]
 authors = [
     { name = "KBTRANSFER contributors" },
 ]
@@ -23,6 +24,12 @@ dependencies = [
     "mcp>=1.0",
     "click>=8.1",
 ]
+
+[project.urls]
+Homepage = "https://github.com/kbtransfer/kbtransfer"
+Source = "https://github.com/kbtransfer/kbtransfer"
+Issues = "https://github.com/kbtransfer/kbtransfer/issues"
+Registry = "https://github.com/kbtransfer/kbtransfer-registry"
 
 [project.optional-dependencies]
 dev = [
@@ -55,6 +62,17 @@ packages = [
     "reference/kb_distiller",
     "reference/kb_registry",
     "reference/kb_registry_server",
+]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+  ".claude/",
+  "registry-repo/",
+  "ROADMAP*.md",
+  "OVERVIEW.md",
+  "REGISTRY_API_NOTES.md",
+  "reports/",
+  "rfcs/",
 ]
 
 [tool.ruff]

@@ -1,0 +1,116 @@
+# release.yml — publish kbtransfer to PyPI on every `v*` tag.
+#
+# ──────────────────────────────────────────────────────────────────
+#   ONE-TIME PYPI SETUP (do this BEFORE the first tag push)
+# ──────────────────────────────────────────────────────────────────
+# Trusted Publishing means GitHub mints a short-lived OIDC token at
+# runtime; PyPI exchanges it for an upload session. No long-lived
+# secret lives in the repo, in this workflow, or in your shell.
+#
+# 1. Open: https://pypi.org/manage/project/kbtransfer/settings/publishing/
+# 2. Under "Trusted publishers" → "Add a new pending publisher",
+#    fill in EXACTLY:
+#       PyPI Project Name:  kbtransfer
+#       Owner:              kbtransfer
+#       Repository name:    kbtransfer
+#       Workflow filename:  release.yml
+#       Environment name:   pypi
+# 3. Save. PyPI now trusts this exact (owner, repo, workflow, env)
+#    tuple to publish without a token.
+#
+# 4. In GitHub: Settings → Environments → New environment → name it
+#    "pypi". (No protection rules required; the environment exists
+#    purely so the OIDC subject claim matches what PyPI expects.
+#    Optionally add "required reviewers" so a human approves every
+#    release before publish runs.)
+#
+# ──────────────────────────────────────────────────────────────────
+#   COMMIT + PUSH THIS WORKFLOW
+# ──────────────────────────────────────────────────────────────────
+#   git add .github/workflows/release.yml
+#   git commit -m "ci: add PyPI release workflow (OIDC trusted publishing)"
+#   git push origin main
+#
+# ──────────────────────────────────────────────────────────────────
+#   CUT A RELEASE
+# ──────────────────────────────────────────────────────────────────
+#   1. Bump `version` in pyproject.toml (e.g. 0.1.0 → 0.1.1).
+#   2. Commit + push that bump to main.
+#   3. Tag and push:
+#        git tag -a v0.1.1 -m "Release 0.1.1"
+#        git push origin v0.1.1
+#   4. The tag push triggers this workflow. Watch it:
+#        gh run watch --repo kbtransfer/kbtransfer
+#   5. On success, the new version appears at
+#      https://pypi.org/project/kbtransfer/.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build sdist + wheel
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install build tooling
+        run: pip install --upgrade build
+
+      - name: Build sdist + wheel
+        run: python -m build
+
+      - name: Upload dist/ as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish to PyPI via Trusted Publishing
+    needs: build
+    runs-on: ubuntu-latest
+
+    # The environment name MUST equal what PyPI's Trusted Publisher
+    # config expects (see header §1 step 2). GitHub injects this
+    # name into the OIDC token's `environment` claim.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/kbtransfer/
+
+    # `id-token: write` is what gives the runner permission to mint
+    # the OIDC token. `contents: read` is the default — listed here
+    # explicitly so a future maintainer doesn't accidentally widen
+    # it.
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download dist/ artifact from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        # No `with: password:` — the action discovers the OIDC token
+        # automatically from the runner environment when
+        # `id-token: write` is granted. PyPI verifies the token's
+        # repo/workflow/environment claims against the Trusted
+        # Publisher record, then accepts the upload.
+        uses: pypa/gh-action-pypi-publish@release/v1
